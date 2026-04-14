@@ -63,8 +63,9 @@ function App() {
       return;
     }
 
-    // Try URL hash (#...)
-    const hash = window.location.hash.slice(1);
+    // Try URL hash (#...) — Telegram appends ?tgWebAppData after the hash, so split on ?
+    const rawHash = window.location.hash.slice(1);
+    const hash = rawHash.split('?')[0];
     if (hash) {
       loadData(hash);
       return;
