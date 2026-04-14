@@ -29,12 +29,10 @@ function App() {
     WebApp.ready();
     WebApp.expand();
 
-    // Parse session data from start_param (base64 encoded JSON)
-    const startParam = WebApp.initDataUnsafe?.start_param;
-    if (startParam) {
+    // Parse session data from query param, hash, or start_param
+    const loadData = (raw: string) => {
       try {
-        const decoded = atob(startParam);
-        const data = JSON.parse(decoded);
+        const data = JSON.parse(decodeURIComponent(raw));
         if (data.sessions) {
           setSessions(data.sessions);
           if (data.stickyId) {
@@ -43,22 +41,30 @@ function App() {
           }
         }
       } catch {
-        // Start param might be too long for base64, try hash
+        // ignore
       }
+    };
+
+    // Try query parameter (?data=...)
+    const params = new URLSearchParams(window.location.search);
+    const queryData = params.get('data');
+    if (queryData) {
+      loadData(queryData);
+      return;
     }
 
-    // Also check URL hash for larger payloads
+    // Try URL hash (#...)
     const hash = window.location.hash.slice(1);
     if (hash) {
+      loadData(hash);
+      return;
+    }
+
+    // Try start_param (base64)
+    const startParam = WebApp.initDataUnsafe?.start_param;
+    if (startParam) {
       try {
-        const data = JSON.parse(decodeURIComponent(hash));
-        if (data.sessions) {
-          setSessions(data.sessions);
-          if (data.stickyId) {
-            setStickyId(data.stickyId);
-            setSelected(data.stickyId);
-          }
-        }
+        loadData(atob(startParam));
       } catch {
         // ignore
       }
