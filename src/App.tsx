@@ -3,7 +3,26 @@ import './App.css';
 import type { Session } from './types';
 
 const WebApp = window.Telegram?.WebApp;
-const API_URL = 'https://honor-quotations-consists-essential.trycloudflare.com';
+function getApiUrl(): string {
+  // Try query param (?api=...)
+  const params = new URLSearchParams(window.location.search);
+  const api = params.get('api');
+  if (api) return api;
+
+  // Try from hash (Telegram puts query after hash)
+  const hash = window.location.hash;
+  const match = hash.match(/[?&]api=([^&]+)/);
+  if (match) return decodeURIComponent(match[1]);
+
+  // Also check tgWebAppStartParam
+  const startMatch = hash.match(/tgWebAppStartParam=([^&]+)/);
+  if (startMatch) return decodeURIComponent(startMatch[1]);
+
+  // Fallback: try localStorage (saved from last session)
+  return localStorage.getItem('claude_api_url') ?? '';
+}
+
+const API_URL = getApiUrl();
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -48,6 +67,7 @@ function App() {
         }
       }
       setError(null);
+      if (API_URL) localStorage.setItem('claude_api_url', API_URL);
     } catch {
       setError('Cannot reach Claude bot');
     }
