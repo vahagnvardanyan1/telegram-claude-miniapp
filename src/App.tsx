@@ -116,9 +116,9 @@ function App() {
       {sessions.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">&#x1F4BB;</div>
-          <div className="empty-title">No sessions</div>
+          <div className="empty-title">No sessions loaded</div>
           <div className="empty-text">
-            Start Claude Code in a terminal to see sessions here
+            Open this app via <strong>/dash</strong> or <strong>/list</strong> in the chat to load sessions
           </div>
         </div>
       ) : (
