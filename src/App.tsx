@@ -1,8 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import type { Session } from './types';
 
 const WebApp = window.Telegram?.WebApp;
+const API_URL = 'https://honor-quotations-consists-essential.trycloudflare.com';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  sessionLabel: string;
+  duration?: number;
+  timestamp: number;
+}
 
 function timeAgo(ts: number): string {
   const diff = Math.floor((Date.now() - ts) / 1000);
@@ -21,87 +30,91 @@ function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [stickyId, setStickyId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const [sent, setSent] = useState(false);
-  const [debug, setDebug] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  const fetchSessions = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/sessions`);
+      const data = await res.json();
+      if (data.sessions) {
+        setSessions(data.sessions);
+        if (data.stickyId && !selected) {
+          setStickyId(data.stickyId);
+          setSelected(data.stickyId);
+        }
+      }
+      setError(null);
+    } catch {
+      setError('Cannot reach Claude bot');
+    }
+  }, [selected]);
 
   useEffect(() => {
-    if (!WebApp) return;
-    WebApp.ready();
-    WebApp.expand();
-
-    // Parse session data from query param, hash, or start_param
-    const loadData = (raw: string) => {
-      try {
-        const data = JSON.parse(decodeURIComponent(raw));
-        if (data.sessions) {
-          setSessions(data.sessions);
-          if (data.stickyId) {
-            setStickyId(data.stickyId);
-            setSelected(data.stickyId);
-          }
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    // Debug: show what we received
-    const debugInfo = [
-      `href: ${window.location.href}`,
-      `search: ${window.location.search}`,
-      `hash: ${window.location.hash}`,
-      `startParam: ${WebApp.initDataUnsafe?.start_param ?? 'none'}`,
-    ].join('\n');
-    setDebug(debugInfo);
-
-    // Try query parameter (?data=...)
-    const params = new URLSearchParams(window.location.search);
-    const queryData = params.get('data');
-    if (queryData) {
-      loadData(queryData);
-      return;
+    if (WebApp) {
+      WebApp.ready();
+      WebApp.expand();
     }
+    fetchSessions();
+    const interval = setInterval(fetchSessions, 10000);
+    return () => clearInterval(interval);
+  }, [fetchSessions]);
 
-    // Try URL hash (#...) — Telegram appends ?tgWebAppData after the hash, so split on ?
-    const rawHash = window.location.hash.slice(1);
-    const hash = rawHash.split('?')[0];
-    if (hash) {
-      loadData(hash);
-      return;
-    }
-
-    // Try start_param (base64)
-    const startParam = WebApp.initDataUnsafe?.start_param;
-    if (startParam) {
-      try {
-        loadData(atob(startParam));
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
+  useEffect(() => {
+    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages]);
 
   const handleSelect = (session: Session) => {
     setSelected(session.id);
     inputRef.current?.focus();
   };
 
-  const handleSend = () => {
-    if (!message.trim() || !selected) return;
+  const handleSend = async () => {
+    if (!message.trim() || !selected || loading) return;
 
-    const payload = JSON.stringify({
-      action: 'send_message',
-      sessionId: selected,
-      message: message.trim(),
-    });
+    const session = sessions.find(s => s.id === selected);
+    if (!session) return;
 
-    if (WebApp) {
-      WebApp.sendData(payload);
-    }
+    const userMsg: ChatMessage = {
+      role: 'user',
+      text: message.trim(),
+      sessionLabel: session.label,
+      timestamp: Date.now(),
+    };
 
-    setSent(true);
+    setMessages(prev => [...prev, userMsg]);
     setMessage('');
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/sessions/${selected}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg.text }),
+      });
+      const data = await res.json();
+
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        text: data.output ?? data.error ?? 'No response',
+        sessionLabel: session.label,
+        duration: data.duration,
+        timestamp: Date.now(),
+      };
+      setMessages(prev => [...prev, assistantMsg]);
+    } catch {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        text: 'Failed to reach Claude bot. Is your Mac online?',
+        sessionLabel: session.label,
+        timestamp: Date.now(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -111,35 +124,27 @@ function App() {
     }
   };
 
-  const targetSession = sessions.find((s) => s.id === selected);
-
-  if (sent) {
-    return (
-      <div className="app">
-        <div className="sent-toast">Sent to Claude</div>
-      </div>
-    );
-  }
+  const targetSession = sessions.find(s => s.id === selected);
 
   return (
     <div className="app">
       <div className="header">
         <h1>Claude Code</h1>
         <div className="header-sub">
-          {sessions.length} session{sessions.length !== 1 ? 's' : ''} active
+          {error ? (
+            <span className="error-text">{error}</span>
+          ) : (
+            `${sessions.length} session${sessions.length !== 1 ? 's' : ''} active`
+          )}
         </div>
       </div>
 
-      {debug && (
-        <pre style={{ padding: '12px 16px', fontSize: '10px', color: '#f97316', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{debug}</pre>
-      )}
-
-      {sessions.length === 0 ? (
+      {sessions.length === 0 && !error ? (
         <div className="empty-state">
           <div className="empty-icon">&#x1F4BB;</div>
-          <div className="empty-title">No sessions loaded</div>
+          <div className="empty-title">No sessions</div>
           <div className="empty-text">
-            Open this app via <strong>/dash</strong> or <strong>/list</strong> in the chat to load sessions
+            Start Claude Code in a terminal to see sessions here
           </div>
         </div>
       ) : (
@@ -162,6 +167,34 @@ function App() {
               </div>
             ))}
           </div>
+
+          {messages.length > 0 && (
+            <>
+              <div className="section-title">Messages</div>
+              <div className="chat-area" ref={chatRef}>
+                {messages.map((msg, i) => (
+                  <div key={i} className={`chat-msg ${msg.role}`}>
+                    <div className="chat-msg-header">
+                      {msg.role === 'user' ? 'You' : 'Claude'}
+                      <span className="chat-msg-meta">
+                        {msg.sessionLabel}
+                        {msg.duration != null && ` · ${msg.duration}s`}
+                      </span>
+                    </div>
+                    <div className="chat-msg-text">{msg.text}</div>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="chat-msg assistant">
+                    <div className="chat-msg-header">Claude <span className="chat-msg-meta">thinking...</span></div>
+                    <div className="chat-msg-text loading-dots">
+                      <span /><span /><span />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -182,10 +215,11 @@ function App() {
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
+            disabled={loading}
           />
           <button
             className="send-btn"
-            disabled={!message.trim() || !selected}
+            disabled={!message.trim() || !selected || loading}
             onClick={handleSend}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

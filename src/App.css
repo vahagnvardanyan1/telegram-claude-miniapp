@@ -241,29 +241,91 @@
   max-width: 260px;
 }
 
-/* Sent confirmation */
-.sent-toast {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--tg-theme-button-color, #3b82f6);
-  color: var(--tg-theme-button-text-color, #fff);
-  padding: 16px 32px;
-  border-radius: 14px;
-  font-size: 16px;
-  font-weight: 600;
-  z-index: 200;
-  animation: toast-in 0.3s ease;
+/* Error */
+.error-text {
+  color: var(--tg-theme-destructive-text-color, #ef5b5b);
 }
 
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
+/* Chat area */
+.chat-area {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-msg {
+  border-radius: 14px;
+  padding: 10px 14px;
+  max-width: 95%;
+  animation: msg-in 0.2s ease;
+}
+
+.chat-msg.user {
+  background: var(--tg-theme-button-color, #3b82f6);
+  color: var(--tg-theme-button-text-color, #fff);
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-msg.assistant {
+  background: var(--tg-theme-secondary-bg-color, #1f2937);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-msg-header {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  opacity: 0.7;
+}
+
+.chat-msg-meta {
+  font-weight: 400;
+  margin-left: 6px;
+  opacity: 0.6;
+}
+
+.chat-msg-text {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+}
+
+.loading-dots {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tg-theme-hint-color, #8a8a8e);
+  animation: dot-pulse 1.4s infinite ease-in-out;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dot-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
