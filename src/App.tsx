@@ -22,6 +22,7 @@ function App() {
   const [stickyId, setStickyId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [sent, setSent] = useState(false);
+  const [debug, setDebug] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -44,6 +45,15 @@ function App() {
         // ignore
       }
     };
+
+    // Debug: show what we received
+    const debugInfo = [
+      `href: ${window.location.href}`,
+      `search: ${window.location.search}`,
+      `hash: ${window.location.hash}`,
+      `startParam: ${WebApp.initDataUnsafe?.start_param ?? 'none'}`,
+    ].join('\n');
+    setDebug(debugInfo);
 
     // Try query parameter (?data=...)
     const params = new URLSearchParams(window.location.search);
@@ -118,6 +128,10 @@ function App() {
           {sessions.length} session{sessions.length !== 1 ? 's' : ''} active
         </div>
       </div>
+
+      {debug && (
+        <pre style={{ padding: '12px 16px', fontSize: '10px', color: '#f97316', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{debug}</pre>
+      )}
 
       {sessions.length === 0 ? (
         <div className="empty-state">
